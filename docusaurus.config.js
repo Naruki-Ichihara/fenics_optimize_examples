@@ -5,7 +5,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 (module.exports = {
   title: 'fenics-optimize',
-  tagline: 'fenics-optimize enables reusable and straightforward UFL coding for physical optimization problems and provides decorators that bridge easily between a fenics calculation chain and optimizers.',
+  tagline: 'Easy to use, multidisciplinary, and high-performance topology optimization for everyone.',
   url: 'https://fenics-optimize.naruki-ichihara.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
@@ -22,13 +22,13 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
+          editUrl: 'https://github.com/Naruki-Ichihara/fenics_optimize_examples/edit/main/website/',
         },
         blog: {
           showReadingTime: true,
           // Please change this to your repo.
           editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+            'https://github.com/fNaruki-Ichihara/fenics_optimize_examples/tree/main/packages/create-docusaurus/templates/shared/',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -54,11 +54,11 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             label: 'Documentation',
           },
           {
-            type: 'doc',
-            docId: 'intro',
+            href: 'https://naruki-ichihara.github.io/fenics_optimize/',
+            label: 'API',
             position: 'left',
-            label: 'Blog',
           },
+          {to: '/blog', label: 'Blog', position: 'left'},
           {
             href: 'https://github.com/Naruki-Ichihara/fenics_optimize_examples',
             label: 'GitHub',
