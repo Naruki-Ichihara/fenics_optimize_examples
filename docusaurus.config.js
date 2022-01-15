@@ -5,14 +5,14 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 (module.exports = {
   title: 'fenics-optimize',
-  tagline: 'Optimization',
+  tagline: 'fenics-optimize enables reusable and straightforward UFL coding for physical optimization problems and provides decorators that bridge easily between a fenics calculation chain and optimizers.',
   url: 'https://fenics-optimize.naruki-ichihara.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'Naruki-Ichihara', // Usually your GitHub org/user name.
+  projectName: 'fenics_optimize_examples', // Usually your repo name.
 
   presets: [
     [
@@ -54,6 +54,12 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             label: 'Documentation',
           },
           {
+            type: 'doc',
+            docId: 'intro',
+            position: 'left',
+            label: 'Blog',
+          },
+          {
             href: 'https://github.com/Naruki-Ichihara/fenics_optimize_examples',
             label: 'GitHub',
             position: 'right',
@@ -67,39 +73,17 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             title: 'Docs',
             items: [
               {
-                label: 'Tutorial',
+                label: 'Instllation',
                 to: '/docs/intro',
               },
-            ],
-          },
-          {
-            title: 'Community',
-            items: [
               {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+                label: 'Getting started',
+                to: '/docs/intro',
               },
               {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
-              },
-              {
-                label: 'Twitter',
-                href: 'https://twitter.com/docusaurus',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'Blog',
-                to: '/blog',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/facebook/docusaurus',
-              },
+                label: 'Cookbook',
+                to: '/docs/intro',
+              }
             ],
           },
         ],
