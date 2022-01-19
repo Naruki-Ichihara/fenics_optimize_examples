@@ -4,12 +4,12 @@ import styles from './HomepageFeatures.module.css';
 
 const FeatureList = [
   {
-    title: 'Focus on What Matters',
+    title: 'Topology optimization in Python',
     Svg: require('../../static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        fenics-optimize provides reusable and straightforward coding
-        for topology optimization problem. 
+        Python is the most popular, easy-to-use, high-performance program language in the sciense.
+        fenics-optimize provides toolbox for the general-purpose topology optimization in the python.
       </>
     ),
   },
@@ -18,8 +18,16 @@ const FeatureList = [
     Svg: require('../../static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        fenics-optimize consists of the high-performance optimization solvers
-        such as the IPOPT-HSL and MMA solver.
+        fenics-optimize contains high-performance optimization solvers such as the IPOPT-HSL and MMA solver.
+      </>
+    ),
+  },
+  {
+    title: 'Parallel computing',
+    Svg: require('../../static/img/undraw_docusaurus_tree.svg').default,
+    description: (
+      <>
+        fenics-optimize has been designed for parallel processing through MPI.
       </>
     ),
   },
