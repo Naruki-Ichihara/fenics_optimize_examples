@@ -1,3 +1,4 @@
+*.sif
 # Dependencies
 /node_modules
 

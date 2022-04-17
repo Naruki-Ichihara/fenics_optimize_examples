@@ -97,7 +97,7 @@ t = TrialFunction(U)
 dt = TestFunction(U)
 ```
 
-Now we can define the `forward` function that return the cost function:
+Now we can define the `forward` function with the weak formation of the model that return the cost:
 
 ```python
 def forward(x):
@@ -152,11 +152,11 @@ x0 = np.ones(problemSize) * m
 and start optimization using `MMAoptimize`
 
 ```python
-op.MMAoptimize(problemSize, x0, forward, constraint, maxeval=100, bounds=[0, 1], rel=1e-20)
+op.MMAoptimize(problemSize, x0, forward, [constraint], [0.0], maxeval=100, bounds=[0, 1], rel=1e-20)
 ```
 
 ```
-Here is result image
+Here is result image (TODO).
 ```
 ## References
 1. A. Gersborg-Hansen et. al., [Topology optimization of heat conduction problems using the finite volume method](https://link.springer.com/article/10.1007/s00158-005-0584-3), *Structural and Multidisciplinary Optimization*, **31** (2006), 251-259
@@ -215,7 +215,7 @@ def constraint(xs):
 problemSize = Function(X).vector().size()
 x0 = np.ones(problemSize) * m
 
-op.MMAoptimize(problemSize, x0, forward, constraint, maxeval=100, bounds=[0, 1], rel=1e-20)
+op.MMAoptimize(problemSize, x0, forward, [constraint], maxeval=100, bounds=[0, 1], rel=1e-20)
 ```
 
 
