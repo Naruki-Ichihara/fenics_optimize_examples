@@ -44,7 +44,7 @@ First, import the `fenics_optimize` with `dolfin`, `dolfin_adjoint` and `numpy` 
 from dolfin import *
 from dolfin_adjoint import *
 import numpy as np
-from fenics_optimize as op
+import fenics_optimize as op
 ```
 Note that, `dolfin_adjoint` must be called after the `dolfin`.
 Next, we define the parameters
@@ -54,7 +54,7 @@ m = 0.3    # Target rate of the material amount
 p = 5      # Penalty parameter
 eps = 1e-3 # Material lower bound
 R = 0.1    # Helmholtz filter radius
-n = 250    # Resolution
+n = 256    # Resolution
 ```
 
 Next we define the SIMP function
@@ -80,8 +80,6 @@ class Left(SubDomain):
     def inside(self, x, on_boundary):
         gamma = 1/n + eps
         return x[0] == 0.0 and 0.5 - gamma < x[1] < 0.5 + gamma and on_boundary
-
-bc = DirichletBC(X, Constant(0.0), Left())
 ```
 
 ```
@@ -95,18 +93,20 @@ U = FunctionSpace(mesh, 'CG', 1)
 T = Function(U, name='Temperture')
 t = TrialFunction(U)
 dt = TestFunction(U)
+bc = DirichletBC(U, Constant(0.0), Left())
 ```
 
 Now we can define the `forward` function with the weak formation of the model that return the cost:
 
 ```python
 def forward(x):
-    a = op.helmholtzFilter(x, X, R=r)
-    a = inner(grad(t), k(a)*grad(dt))*dx
+    rho = op.helmholtzFilter(x[0], X, R=R)
+    rho.rename('label', 'control')
+    a = inner(grad(t), k(rho)*grad(dt))*dx
     L = f*dt*dx
-    A, b = assemble_system(a, L, bcs)
-    T = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(a)*grad(T))*dx)
+    A, b = assemble_system(a, L, bc)
+    T_s = op.AMGsolver(A, b).solve(T, U, False)
+    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
     return J
 ```
 
@@ -120,13 +120,13 @@ To ready the automatic derivative, decorate the `forward` function by the `with_
 ```python
 @op.with_derivative([X])
 def forward(x):
-    a = op.helmholtzFilter(x[0], X, R=r)
-    a.rename('label', 'control')
-    a = inner(grad(t), k(a)*grad(dt))*dx
+    rho = op.helmholtzFilter(x[0], X, R=R)
+    rho.rename('label', 'control')
+    a = inner(grad(t), k(rho)*grad(dt))*dx
     L = f*dt*dx
-    A, b = assemble_system(a, L, bcs)
-    T = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(a)*grad(T))*dx)
+    A, b = assemble_system(a, L, bc)
+    T_s = op.AMGsolver(A, b).solve(T, U, False)
+    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
     return J
 ```
 
@@ -135,10 +135,10 @@ Next we define the mass volume amount function with derivative:
 ```python
 @op.with_derivative([X])
 def constraint(xs):
-    a_bulk = project(Constant(1.0), X)
-    a_0 = assemble(a_bulk*dx)
-    a_f = assemble(xs[0]*dx)
-    rel = a_f/a_0
+    rho_bulk = project(Constant(1.0), X)
+    rho_0 = assemble(rho_bulk*dx)
+    rho_f = assemble(xs[0]*dx)
+    rel = rho_f/rho_0
     return rel - m
 ```
 
@@ -167,55 +167,55 @@ Here is result image (TODO).
 from dolfin import *
 from dolfin_adjoint import *
 import numpy as np
-from fenics_optimize as op
+import fenics_optimize as op
 
 m = 0.3    # Target rate of the material amount
 p = 5      # Penalty parameter
 eps = 1e-3 # Material lower bound
 R = 0.1    # Helmholtz filter radius
-n = 250    # Resolution
+n = 256    # Resolution
 
 def k(a):
     return eps + (1 - eps) * a ** p
 
 mesh = UnitSquareMesh(n, n)
 X = FunctionSpace(mesh, 'CG', 1)
+f = interpolate(Constant(1e-2), X)
 
 class Left(SubDomain):
     def inside(self, x, on_boundary):
         gamma = 1/n + eps
         return x[0] == 0.0 and 0.5 - gamma < x[1] < 0.5 + gamma and on_boundary
 
-bc = DirichletBC(X, Constant(0.0), Left())
-
 U = FunctionSpace(mesh, 'CG', 1)
 T = Function(U, name='Temperture')
 t = TrialFunction(U)
 dt = TestFunction(U)
+bc = DirichletBC(U, Constant(0.0), Left())
 
 @op.with_derivative([X])
 def forward(x):
-    a = op.helmholtzFilter(x[0], X, R=r)
-    a.rename('label', 'control')
-    a = inner(grad(t), k(a)*grad(dt))*dx
+    rho = op.helmholtzFilter(x[0], X, R=R)
+    rho.rename('label', 'control')
+    a = inner(grad(t), k(rho)*grad(dt))*dx
     L = f*dt*dx
-    A, b = assemble_system(a, L, bcs)
-    T = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(a)*grad(T))*dx)
+    A, b = assemble_system(a, L, bc)
+    T_s = op.AMGsolver(A, b).solve(T, U, False)
+    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
     return J
 
 @op.with_derivative([X])
 def constraint(xs):
-    a_bulk = project(Constant(1.0), X)
-    a_0 = assemble(a_bulk*dx)
-    a_f = assemble(xs[0]*dx)
-    rel = a_f/a_0
+    rho_bulk = project(Constant(1.0), X)
+    rho_0 = assemble(rho_bulk*dx)
+    rho_f = assemble(xs[0]*dx)
+    rel = rho_f/rho_0
     return rel - m
 
 problemSize = Function(X).vector().size()
 x0 = np.ones(problemSize) * m
 
-op.MMAoptimize(problemSize, x0, forward, [constraint], maxeval=100, bounds=[0, 1], rel=1e-20)
+op.MMAoptimize(problemSize, x0, forward, [constraint], [0], maxeval=100, bounds=[0, 1], rel=1e-20)
 ```
 
 
