@@ -6,8 +6,8 @@ const katex = require('rehype-katex');
 // With JSDoc @type annotations, IDEs can provide config autocompletion
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 (module.exports = {
-  title: 'fenics-optimize',
-  tagline: 'Easy to use, multidisciplinary, and high-performance topology optimization for everyone.',
+  title: 'optf(X)',
+  tagline: 'Easy to use, multidisciplinary, and high-performance field optimization in Python.',
   url: 'https://fenics-optimize.naruki-ichihara.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
