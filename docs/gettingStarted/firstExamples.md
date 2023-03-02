@@ -5,7 +5,7 @@ sidebar_position: 1
 # A First example
 
 ## Theory
-Let's start with your first optimization example. If you are the first of FEniCS computing, please see the [tutorial of the FEniCS](https://fenicsproject.org/documentation/).
+Start with your first optimization example. If you are the first of FEniCS computing, please see the [tutorial of the FEniCS](https://fenicsproject.org/documentation/).
 This example is based on the dolfin-adjoint's documentation. Please also see [this page](http://www.dolfin-adjoint.org/en/latest/documentation/poisson-topology/poisson-topology.html).
 
 Here, we are concerned about minimizing the following compliance:
@@ -39,23 +39,27 @@ here, $m$ is the target material amount. In this example, the Helmholtz regulari
 
 ## Implimentation 
 
-First, import the `fenics_optimize` with `dolfin`, `dolfin_adjoint` and `numpy` packages.
+First, import the `optfx` with `numpy` package.
 ```python
-from dolfin import *
-from dolfin_adjoint import *
 import numpy as np
-import fenics_optimize as op
+import optfx as opt
 ```
-Note that, `dolfin_adjoint` must be called after the `dolfin`.
 Next, we define the parameters
 
 ```python
-m = 0.3    # Target rate of the material amount
+opt.parameters["form_compiler"]["optimize"] = True
+opt.parameters["form_compiler"]["cpp_optimize"] = True
+opt.parameters['form_compiler']['quadrature_degree'] = 5
+
+comm = opt.MPI.comm_world
+m = 0.30   # Target rate of the material amount
 p = 5      # Penalty parameter
 eps = 1e-3 # Material lower bound
-R = 0.1    # Helmholtz filter radius
+R = 0.01   # Helmholtz filter radius
 n = 256    # Resolution
+f = opt.interpolate(opt.Constant(1e-2), X)
 ```
+Notably, `opt.MPI.comm_world` enables the parallel computing with MPI.
 
 Next we define the SIMP function
 
@@ -67,8 +71,8 @@ def k(a):
 Then the unit square design space is defined by
 
 ```python
-mesh = UnitSquareMesh(n, n)
-X = FunctionSpace(mesh, 'CG', 1)
+mesh = opt.UnitSquareMesh(comm, n, n)
+X = opt.FunctionSpace(mesh, 'CG', 1)
 ```
 
 where, design space is discretized by the first order Continuous Galerkin space.
@@ -76,146 +80,169 @@ where, design space is discretized by the first order Continuous Galerkin space.
 Next, we define the sub-domain for the Dirichlet boundary condition:
 
 ```python
-class Left(SubDomain):
+class Left(opt.SubDomain):
     def inside(self, x, on_boundary):
-        gamma = 1/n + eps
+        gamma = 1/250 + 1e-5
         return x[0] == 0.0 and 0.5 - gamma < x[1] < 0.5 + gamma and on_boundary
-```
-
-```
-image is here
 ```
 
 Next, we define the function space of the model:
 
 ```python
-U = FunctionSpace(mesh, 'CG', 1)
-T = Function(U, name='Temperture')
-t = TrialFunction(U)
-dt = TestFunction(U)
-bc = DirichletBC(U, Constant(0.0), Left())
+U = opt.FunctionSpace(mesh, 'CG', 1)
+t = opt.TrialFunction(U)
+dt = opt.TestFunction(U)
+bc = opt.DirichletBC(U, opt.Constant(0.0), Left())
 ```
 
-Now we can define the `forward` function with the weak formation of the model that return the cost:
+Now we can define the `Problem` function with the weak formation of the model that return the cost:
 
 ```python
-def forward(x):
-    rho = op.helmholtzFilter(x[0], X, R=R)
-    rho.rename('label', 'control')
-    a = inner(grad(t), k(rho)*grad(dt))*dx
-    L = f*dt*dx
-    A, b = assemble_system(a, L, bc)
-    T_s = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
-    return J
+class PoissonProblem():
+    def problem(self, controls):
+        rho = controls[0]
+        rho = opt.helmholtzFilter(rho, X, R)
+        a = opt.inner(opt.grad(t), k(rho)*opt.grad(dt))*opt.dx
+        L = opt.inner(f, dt)*opt.dx
+        Th = opt.Function(U, name='Temperture')
+        opt.solve(a==L, Th, bc)
+        J = opt.assemble(opt.inner(opt.grad(Th), k(rho)*opt.grad(Th))*opt.dx)
+        rho_bulk = opt.project(opt.Constant(1.0), X)
+        rho_0 = opt.assemble(rho_bulk*opt.dx)
+        rho_total = opt.assemble(controls[0]*opt.dx)
+        rel = rho_total/rho_0
+        self.volumeFraction = rel
+        return J
+    def constraint_volume(self):
+        return self.volumeFraction - m
 ```
 
-The `op.AMGsolver` provides efficient and robust FE solvers for multiphysics. 
+In the case of the topology optimization, the sensitivity is needed to optimize because the number of controls is enormous.
+Generally, the sensitivity is calculated by the analytical approach. However, the sensitivity will be calculated automatically by using the optfx.
 
-In the case of the topology optimization, the Jacobian is needed to optimize because the number of controls is enormous.
-Generally, the Jacobian is calculated by the analytical approach. However, the Jacobian will be calculated automatically by using the decorator, `with_derivative`.
-
-To ready the automatic derivative, decorate the `forward` function by the `with_derivative([X])`.
+To ready the automatic derivative, `opt.Module` can be used like as:
 
 ```python
-@op.with_derivative([X])
-def forward(x):
-    rho = op.helmholtzFilter(x[0], X, R=R)
-    rho.rename('label', 'control')
-    a = inner(grad(t), k(rho)*grad(dt))*dx
-    L = f*dt*dx
-    A, b = assemble_system(a, L, bc)
-    T_s = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
-    return J
+class PoissonProblem(opt.Module):
+    def problem(self, controls):
+        rho = controls[0]
+        rho = opt.helmholtzFilter(rho, X, R)
+        a = opt.inner(opt.grad(t), k(rho)*opt.grad(dt))*opt.dx
+        L = opt.inner(f, dt)*opt.dx
+        Th = opt.Function(U, name='Temperture')
+        opt.solve(a==L, Th, bc)
+        J = opt.assemble(opt.inner(opt.grad(Th), k(rho)*opt.grad(Th))*opt.dx)
+        rho_bulk = opt.project(opt.Constant(1.0), X)
+        rho_0 = opt.assemble(rho_bulk*opt.dx)
+        rho_total = opt.assemble(controls[0]*opt.dx)
+        rel = rho_total/rho_0
+        self.volumeFraction = rel
+        return J
+    def constraint_volume(self):
+        return self.volumeFraction - m
 ```
 
 Next we define the mass volume amount function with derivative:
-
-```python
-@op.with_derivative([X])
-def constraint(xs):
-    rho_bulk = project(Constant(1.0), X)
-    rho_0 = assemble(rho_bulk*dx)
-    rho_f = assemble(xs[0]*dx)
-    rel = rho_f/rho_0
-    return rel - m
-```
-
 Now we ready for the optimization: Finally, the initial value is defined
 
 ```python
-problemSize = Function(X).vector().size()
-x0 = np.ones(problemSize) * m
+class Initial_density(opt.UserExpression):
+    def eval(self, value, x):
+        value[0] = m
+x0 = opt.Function(X)
+x0.interpolate(Initial_density())
 ```
 
-and start optimization using `MMAoptimize`
+and start optimization using `optimize`:
 
 ```python
-op.MMAoptimize(problemSize, x0, forward, [constraint], [0.0], maxeval=100, bounds=[0, 1], rel=1e-20)
+N = opt.Function(X).vector().size()
+min_bounds = np.zeros(N)
+max_bounds = np.ones(N)
+
+setting = {'set_lower_bounds': min_bounds,
+           'set_upper_bounds': max_bounds,
+           'set_maxeval': 1000
+          }
+params = {'verbosity': 1}
+
+problem = PoissonProblem()
+solution = opt.optimize(problem, [x0], [0], setting, params)
 ```
 
-```
-Here is result image (TODO).
-```
 ## References
 1. A. Gersborg-Hansen et. al., [Topology optimization of heat conduction problems using the finite volume method](https://link.springer.com/article/10.1007/s00158-005-0584-3), *Structural and Multidisciplinary Optimization*, **31** (2006), 251-259
 1. B. S. Lazarov et. al., [Filters in topology optimization based on Helmholtz-type differential equations](https://onlinelibrary.wiley.com/doi/full/10.1002/nme.3072), *International Journal for Numerical Methods in Engineering*, **28** (2010), 765-781
 
 ## Complete code
 ```python
-from dolfin import *
-from dolfin_adjoint import *
 import numpy as np
-import fenics_optimize as op
+import optfx as opt
 
-m = 0.3    # Target rate of the material amount
+opt.parameters["form_compiler"]["optimize"] = True
+opt.parameters["form_compiler"]["cpp_optimize"] = True
+opt.parameters['form_compiler']['quadrature_degree'] = 5
+
+comm = opt.MPI.comm_world
+m = 0.30   # Target rate of the material amount
 p = 5      # Penalty parameter
 eps = 1e-3 # Material lower bound
-R = 0.1    # Helmholtz filter radius
+R = 0.01   # Helmholtz filter radius
 n = 256    # Resolution
 
 def k(a):
     return eps + (1 - eps) * a ** p
 
-mesh = UnitSquareMesh(n, n)
-X = FunctionSpace(mesh, 'CG', 1)
-f = interpolate(Constant(1e-2), X)
+mesh = opt.UnitSquareMesh(comm, n, n)
+X = opt.FunctionSpace(mesh, 'CG', 1)
+f = opt.interpolate(opt.Constant(1e-2), X)
 
-class Left(SubDomain):
+class Initial_density(opt.UserExpression):
+    def eval(self, value, x):
+        value[0] = m
+
+class Left(opt.SubDomain):
     def inside(self, x, on_boundary):
-        gamma = 1/n + eps
+        gamma = 1/250 + 1e-5
         return x[0] == 0.0 and 0.5 - gamma < x[1] < 0.5 + gamma and on_boundary
 
-U = FunctionSpace(mesh, 'CG', 1)
-T = Function(U, name='Temperture')
-t = TrialFunction(U)
-dt = TestFunction(U)
-bc = DirichletBC(U, Constant(0.0), Left())
+U = opt.FunctionSpace(mesh, 'CG', 1)
+t = opt.TrialFunction(U)
+dt = opt.TestFunction(U)
+bc = opt.DirichletBC(U, opt.Constant(0.0), Left())
 
-@op.with_derivative([X])
-def forward(x):
-    rho = op.helmholtzFilter(x[0], X, R=R)
-    rho.rename('label', 'control')
-    a = inner(grad(t), k(rho)*grad(dt))*dx
-    L = f*dt*dx
-    A, b = assemble_system(a, L, bc)
-    T_s = op.AMGsolver(A, b).solve(T, U, False)
-    J = assemble(inner(grad(T), k(rho)*grad(T_s))*dx)
-    return J
+class PoissonProblem(opt.Module):
+    def problem(self, controls):
+        rho = controls[0]
+        rho = opt.helmholtzFilter(rho, X, R)
+        a = opt.inner(opt.grad(t), k(rho)*opt.grad(dt))*opt.dx
+        L = opt.inner(f, dt)*opt.dx
+        Th = opt.Function(U, name='Temperture')
+        opt.solve(a==L, Th, bc)
+        J = opt.assemble(opt.inner(opt.grad(Th), k(rho)*opt.grad(Th))*opt.dx)
+        rho_bulk = opt.project(opt.Constant(1.0), X)
+        rho_0 = opt.assemble(rho_bulk*opt.dx)
+        rho_total = opt.assemble(controls[0]*opt.dx)
+        rel = rho_total/rho_0
+        self.volumeFraction = rel
+        return J
+    def constraint_volume(self):
+        return self.volumeFraction - m
 
-@op.with_derivative([X])
-def constraint(xs):
-    rho_bulk = project(Constant(1.0), X)
-    rho_0 = assemble(rho_bulk*dx)
-    rho_f = assemble(xs[0]*dx)
-    rel = rho_f/rho_0
-    return rel - m
+x0 = opt.Function(X)
+x0.interpolate(Initial_density())
+N = opt.Function(X).vector().size()
+min_bounds = np.zeros(N)
+max_bounds = np.ones(N)
 
-problemSize = Function(X).vector().size()
-x0 = np.ones(problemSize) * m
+setting = {'set_lower_bounds': min_bounds,
+           'set_upper_bounds': max_bounds,
+           'set_maxeval': 1000
+          }
+params = {'verbosity': 1}
 
-op.MMAoptimize(problemSize, x0, forward, [constraint], [0], maxeval=100, bounds=[0, 1], rel=1e-20)
+problem = PoissonProblem()
+solution = opt.optimize(problem, [x0], [0], setting, params)
 ```
 
 
